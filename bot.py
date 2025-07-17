@@ -1,53 +1,55 @@
-import os
 import logging
-import requests
+import os
+import itertools
+import httpx
+from time import sleep
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 logging.basicConfig(level=logging.INFO)
-TOKEN = os.getenv("BOT_TOKEN")
-
-def generate_usernames(base):
-    alphabet = 'abcdefghijklmnopqrstuvwxyz'
-    result = []
-
-    for i in range(len(base) + 1):
-        for huruf in alphabet:
-            username = base[:i] + huruf + base[i:]
-            result.append(f"@{username.lower()}")
-
-    return result[:50]
-
-def is_taken(username):
-    try:
-        r = requests.get(f"https://t.me/{username.strip('@')}", timeout=5)
-        return r.status_code == 200
-    except:
-        return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Kirim kata dasar username, contoh: ganteng")
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kata = update.message.text.strip()
-    if not kata.isalpha():
-        await update.message.reply_text("Masukkan hanya huruf tanpa spasi atau simbol.")
+def generate_variations(base):
+    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    results = set()
+    for positions in itertools.product(alphabet, repeat=len(base) + 1):
+        for i in range(len(base) + 1):
+            s = base[:i] + positions[i] + base[i:]
+            results.add(s)
+    return list(results)
+
+async def check_username(username):
+    url = f"https://t.me/{username}"
+    async with httpx.AsyncClient() as client:
+        r = await client.get(url)
+        return r.status_code != 200
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.lower()
+    if not text.isalpha():
+        await update.message.reply_text("Kirim hanya huruf tanpa spasi atau simbol.")
         return
 
-    await update.message.reply_text("Sedang memeriksa...")
+    await update.message.reply_text("Mengecek username, tunggu sebentar...")
 
-    hasil = ""
-    for username in generate_usernames(kata):
-        status = "✅" if is_taken(username) else "❎"
-        hasil += f"{username} {status}\n"
+    candidates = generate_variations(text)[:10]
+    result = ""
+    for username in candidates:
+        status = await check_username(username)
+        emoji = "❎" if status else "✅"
+        result += f"@{username} {emoji}\n"
+        await sleep(0.5)
 
-    for i in range(0, len(hasil), 4000):
-        await update.message.reply_text(hasil[i:i+4000])
+    await update.message.reply_text(result)
 
 def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
 
 if __name__ == "__main__":
