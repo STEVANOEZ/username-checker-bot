@@ -1,49 +1,60 @@
-import os
-import logging
-import requests
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
+import os, logging, requests
+
+# Logging
+logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("BOT_TOKEN")
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def generate_usernames(base_word):
+def generate_usernames(base):
     alphabet = "abcdefghijklmnopqrstuvwxyz"
     results = set()
-    for i in range(len(base_word) + 1):
-        for char in alphabet:
-            username = base_word[:i] + char + base_word[i:]
-            results.add("@" + username)
-    results.add("@" + base_word)
+    for i in range(len(base) + 1):
+        for c in alphabet:
+            results.add(base[:i] + c + base[i:])
     return sorted(results)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Kirim kata dasar username, contoh: ganteng")
+def is_taken(uname):
+    try:
+        r = requests.get(f"https://t.me/{uname}", timeout=5)
+        return r.status_code == 200
+    except:
+        return True
 
-async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("Contoh penggunaan: /check ganteng")
+async def start(update, ctx):
+    await update.message.reply_text("Kirim kata dasar (contoh: ganteng) atau gunakan /check <kata>")
+
+async def check(update, ctx):
+    if not ctx.args:
+        return await start(update, ctx)
+    await process_text(update, ctx, ctx.args[0].lower())
+
+async def process_text(update, ctx, text):
+    await update.message.reply_text(f"🔍 Mencari variasi untuk: {text}")
+    usernames = generate_usernames(text)
+    batch = ""
+    for i, uname in enumerate(usernames, 1):
+        marker = "✅" if is_taken(uname) else "❎"
+        batch += f"@{uname} {marker}\n"
+        if i % 20 == 0:
+            await update.message.reply_text(batch)
+            batch = ""
+    if batch:
+        await update.message.reply_text(batch)
+
+async def handle_message(update, ctx):
+    text = update.message.text.strip()
+    if text.startswith("/"):
         return
+    await process_text(update, ctx, text.lower())
 
-    base_word = context.args[0].lower()
-    usernames = generate_usernames(base_word)
-    results = []
-
-    for username in usernames:
-        url = f"https://t.me/{username[1:]}"
-        r = requests.get(url)
-        if "If you have Telegram" in r.text or r.status_code == 200:
-            results.append(f"{username} ✅")
-        else:
-            results.append(f"{username} ❎")
-
-    await update.message.reply_text("\n".join(results[:40]))
-
-if __name__ == '__main__':
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("check", check))
-    logger.info("Bot is running...")
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    logging.info("Bot started!")
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
