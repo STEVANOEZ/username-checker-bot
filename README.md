@@ -1,13 +1,21 @@
-# Username Checker Telegram Bot
+# Telegram Username Checker Bot
 
-Bot Telegram untuk generate dan mengecek username yang tersedia di Telegram.
+Bot ini bisa mengecek apakah username tertentu masih tersedia di Telegram.
 
-## Cara Jalankan di Heroku
+## Cara Deploy
 
-1. Deploy dari GitHub repo ini
-2. Tambahkan Config Vars:
-    - `BOT_TOKEN`: Token bot Telegram kamu
+1. Klik tombol ini:
 
-## Command
-- `/start` - Mulai bot
-- `/check <kata>` - Generate username + cek apakah tersedia
+   [![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/STEVANOEZ/username-checker-bot)
+
+2. Masukkan `BOT_TOKEN` dari BotFather.
+
+3. Klik "Deploy".
+
+## Cara Pakai
+
+- Kirim `/start`
+- Kirim kata dasar username, contoh `ganteng`
+- Bot akan membalas dengan kombinasi username dan statusnya:
+  - ✅ tersedia
+  - ❎ sudah dipakai
