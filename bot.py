@@ -1,59 +1,53 @@
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
-import os, logging, requests
+import os
+import logging
+import requests
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-# Logging
 logging.basicConfig(level=logging.INFO)
-
 TOKEN = os.getenv("BOT_TOKEN")
 
 def generate_usernames(base):
-    alphabet = "abcdefghijklmnopqrstuvwxyz"
-    results = set()
-    for i in range(len(base) + 1):
-        for c in alphabet:
-            results.add(base[:i] + c + base[i:])
-    return sorted(results)
+    alphabet = 'abcdefghijklmnopqrstuvwxyz'
+    result = []
 
-def is_taken(uname):
+    for i in range(len(base) + 1):
+        for huruf in alphabet:
+            username = base[:i] + huruf + base[i:]
+            result.append(f"@{username.lower()}")
+
+    return result[:50]
+
+def is_taken(username):
     try:
-        r = requests.get(f"https://t.me/{uname}", timeout=5)
+        r = requests.get(f"https://t.me/{username.strip('@')}", timeout=5)
         return r.status_code == 200
     except:
-        return True
+        return False
 
-async def start(update, ctx):
-    await update.message.reply_text("Kirim kata dasar (contoh: ganteng) atau gunakan /check <kata>")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Kirim kata dasar username, contoh: ganteng")
 
-async def check(update, ctx):
-    if not ctx.args:
-        return await start(update, ctx)
-    await process_text(update, ctx, ctx.args[0].lower())
-
-async def process_text(update, ctx, text):
-    await update.message.reply_text(f"🔍 Mencari variasi untuk: {text}")
-    usernames = generate_usernames(text)
-    batch = ""
-    for i, uname in enumerate(usernames, 1):
-        marker = "✅" if is_taken(uname) else "❎"
-        batch += f"@{uname} {marker}\n"
-        if i % 20 == 0:
-            await update.message.reply_text(batch)
-            batch = ""
-    if batch:
-        await update.message.reply_text(batch)
-
-async def handle_message(update, ctx):
-    text = update.message.text.strip()
-    if text.startswith("/"):
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    kata = update.message.text.strip()
+    if not kata.isalpha():
+        await update.message.reply_text("Masukkan hanya huruf tanpa spasi atau simbol.")
         return
-    await process_text(update, ctx, text.lower())
+
+    await update.message.reply_text("Sedang memeriksa...")
+
+    hasil = ""
+    for username in generate_usernames(kata):
+        status = "✅" if is_taken(username) else "❎"
+        hasil += f"{username} {status}\n"
+
+    for i in range(0, len(hasil), 4000):
+        await update.message.reply_text(hasil[i:i+4000])
 
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("check", check))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    logging.info("Bot started!")
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
 
 if __name__ == "__main__":
