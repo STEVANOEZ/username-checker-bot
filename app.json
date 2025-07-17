@@ -1,0 +1,17 @@
+{
+  "name": "Telegram Username Checker Bot",
+  "description": "Bot Telegram untuk cek username sudah dipakai atau belum",
+  "repository": "https://github.com/STEVANOEZ/username-checker-bot",
+  "keywords": ["telegram", "bot", "username", "checker"],
+  "env": {
+    "BOT_TOKEN": {
+      "description": "Token dari BotFather",
+      "required": true
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ]
+}
